@@ -1,0 +1,33 @@
+:root {
+  color-scheme: light;
+  --background: #f8f9fc;
+  --surface: #ffffff;
+  --text: #253247;
+  --muted: #737f91;
+  --accent: #2873cf;
+  --accent-light: #eaf2fe;
+  --line: #e7eaf0;
+  --line-soft: #f0f2f6;
+  --input: #fafbfe;
+  --search: #eef0f5;
+  --nav: #ffffffed;
+  --danger: #b53639;
+  --focus: #7bb0f0;
+  --shadow: 0 3px 12px #21375904;
+}
+/* Future appearance setting can set data-theme without changing components. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #141b18;
+  --surface: #1d2722;
+  --text: #e9f1ec;
+  --muted: #a1b1a8;
+  --accent: #327bd1;
+  --accent-light: #243650;
+  --line: #39493f;
+  --line-soft: #2b3931;
+  --input: #18201b;
+  --search: #2a372f;
+  --nav: #1d2722ed;
+  --danger: #ed9c9d;
+}

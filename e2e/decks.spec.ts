@@ -1,0 +1,51 @@
+import { test, expect } from '@playwright/test';
+import { start, importText, storedData } from './helpers';
+
+test('CSV/TSV languages, automatic tag selection, exclusion and manual selection persist', async ({ page }) => {
+  await start(page);
+  await importText(page, 'front,back,tags,notes,frontLanguage,backLanguage\nRegular,支配下,"横浜ベイスターズ,投手",,en-US,ja-JP\nTrainee,育成選手,"横浜ベイスターズ,育成",,en-US,ja-JP\nOther,他球団,他球団,,en-US,ja-JP', 3);
+  await importText(page, 'hello\tこんにちは\t挨拶,基本', 1);
+  await page.getByRole('link', { name: 'デッキ', exact: true }).click();
+  await page.getByRole('button', { name: 'デッキを作成', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'デッキを作成', exact: true });
+  await editor.getByLabel('デッキ名', { exact: true }).fill('チーム');
+  const include = editor.getByRole('group', { name: '含めるタグ', exact: true });
+  const exclude = editor.getByRole('group', { name: '除外するタグ', exact: true });
+  const count = editor.locator('.deck-selection-summary strong');
+  await include.getByRole('button', { name: '横浜ベイスターズ', exact: true }).click();
+  await expect(count).toHaveText('選択済み 2枚');
+  await exclude.getByRole('button', { name: '育成', exact: true }).click();
+  await expect(count).toHaveText('選択済み 1枚');
+  await include.getByRole('button', { name: '他球団', exact: true }).click();
+  await expect(count).toHaveText('選択済み 0枚');
+  await editor.getByLabel('含めるタグの条件').selectOption('any');
+  await expect(count).toHaveText('選択済み 2枚');
+  await editor.getByRole('button', { name: '1枚ずつ選ぶ', exact: true }).click();
+  await editor.getByRole('button', { name: '検索・タグ絞り込みを解除' }).click();
+  await editor.getByRole('searchbox', { name: 'デッキに追加するカードを検索' }).fill('Trainee');
+  await editor.getByRole('checkbox', { name: 'Traineeをデッキに含める' }).check();
+  await expect(count).toHaveText('選択済み 3枚');
+  await editor.getByRole('button', { name: '内容を確認' }).click();
+  await expect(editor.locator('.deck-card-option')).toHaveCount(3);
+  await editor.getByRole('button', { name: 'デッキを保存' }).click();
+  await expect(editor).toBeHidden();
+  await page.reload();
+  await page.getByRole('button', { name: 'チームを編集', exact: true }).click();
+  await expect(page.locator('.deck-selection-summary strong')).toHaveText('選択済み 3枚');
+  const cards = (await storedData(page)).cards;
+  expect(cards.find(card => card.frontText === 'Regular')).toMatchObject({ frontLanguage: 'en-US', backLanguage: 'ja-JP' });
+  expect(cards).toHaveLength(9);
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('malformed CSV never writes cards', async ({ page }) => {
+  await start(page);
+  const before = await storedData(page);
+  await page.getByRole('link', { name: 'カード', exact: true }).click();
+  await page.getByRole('button', { name: 'CSV／TSVを貼り付けて追加' }).click();
+  await page.getByLabel('CSV／TSVを貼り付け', { exact: true }).fill('front,back,tags\na,b,"unfinished');
+  await page.getByRole('button', { name: '取り込み内容を確認' }).click();
+  await expect(page.getByRole('alert')).toContainText('引用符が閉じて');
+  expect(await storedData(page)).toEqual(before);
+});
