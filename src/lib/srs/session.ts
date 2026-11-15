@@ -24,17 +24,30 @@ function dailyBudget(cards: Card[], history: Review[], options: StudyOptions, no
   const date = new Date(now);
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
-  const reviewed = new Set(history.filter(review => ids.has(review.cardId) && review.reviewedAt >= start && review.reviewedAt < end).map(review => review.cardId));
+  const reviewed = new Set<string>();
+  const lastReviewed = new Map<string, number>();
+  for (const review of history) {
+    if (!ids.has(review.cardId) || review.reviewedAt < start || review.reviewedAt >= end) continue;
+    reviewed.add(review.cardId);
+    lastReviewed.set(review.cardId, Math.max(lastReviewed.get(review.cardId) ?? -Infinity, review.reviewedAt));
+  }
   const target = Math.min(options.dailyLimit, ids.size);
   const remaining = Math.max(0, target - reviewed.size);
-  return { reviewed, target, remaining, complete: target > 0 && remaining === 0 };
+  return { reviewed, lastReviewed, target, remaining, complete: target > 0 && remaining === 0 };
 }
 
 function sessionSelection(cards: Card[], history: Review[], options: StudyOptions, now: number) {
   const budget = dailyBudget(cards, history, options, now);
   const eligible = eligibleStudyCards(cards, history, options, now);
-  const selected = budget && !budget.complete ? eligible.filter(card => !budget.reviewed.has(card.id)) : eligible;
-  return { selected, budget, limit: budget ? (budget.complete ? budget.target : budget.remaining) : selected.length };
+  if (!budget) return { selected: eligible, budget, limit: eligible.length };
+
+  // Continue through cards not yet seen today before starting another round.
+  // Once every card has been seen, the oldest review from today goes first so
+  // repeated sessions rotate instead of always returning the same weak cards.
+  const unseen = eligible.filter(card => !budget.reviewed.has(card.id));
+  const selected = unseen.length ? unseen : eligible;
+  const limit = budget.complete ? Math.min(budget.target, selected.length) : Math.min(budget.remaining, selected.length);
+  return { selected, budget, limit };
 }
 
 /** The most recent rating determines exclusion; old easy ratings never hide a later failure. */
@@ -60,10 +73,18 @@ export function planStudyStart(cards: Card[], history: Review[], requested: Stud
     && !eligibleStudyCards(cards, history, { ...options, dailyLimit: undefined, excludeEasy: false }, now).length;
   if (reviewComplete) options.includeScheduled = true;
   let selection = sessionSelection(cards, history, options, now);
-  const exclusionRelaxed = !!cards.length && !selection.selected.length && options.excludeEasy;
+  let exclusionRelaxed = false;
+  if (cards.length && options.excludeEasy) {
+    const relaxed = sessionSelection(cards, history, { ...options, excludeEasy: false }, now);
+    const reviewedOnly = !!selection.budget && selection.selected.length > 0
+      && selection.selected.every(card => selection.budget?.reviewed.has(card.id));
+    const unlocksUnseen = reviewedOnly && !!relaxed.budget
+      && relaxed.selected.some(card => !relaxed.budget?.reviewed.has(card.id));
+    exclusionRelaxed = !selection.selected.length || unlocksUnseen;
+    if (exclusionRelaxed) selection = relaxed;
+  }
   if (exclusionRelaxed) {
     options.excludeEasy = false;
-    selection = sessionSelection(cards, history, options, now);
   }
   const notice = [
     selection.budget?.complete ? `今日の学習目標（${selection.budget.target}枚）は達成しています。引き続き、追加で学習できます。` : '',
@@ -80,7 +101,16 @@ export function createSession(cards: Card[], history: Review[], options = DEFAUL
   const priority = (card: Card) => scheduler.priority(card, now) + 8 * (failures.get(card.id) ?? 0) / Math.max(1, card.reviewCount);
   const { selected, budget, limit } = sessionSelection(cards, history, options, now);
   const due = (card: Card) => Number(card.reviewCount === 0 || card.nextReviewAt <= now);
-  if (options.mode === 'automatic' || options.order === 'mastery') selected.sort((a, b) => (budget ? due(b) - due(a) : 0) || priority(b) - priority(a) || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  if (options.mode === 'automatic' || options.order === 'mastery') selected.sort((a, b) => {
+    const dailyRotation = budget && budget.reviewed.has(a.id) && budget.reviewed.has(b.id)
+      ? (budget.lastReviewed.get(a.id) ?? 0) - (budget.lastReviewed.get(b.id) ?? 0)
+      : 0;
+    return dailyRotation
+      || (budget ? due(b) - due(a) : 0)
+      || priority(b) - priority(a)
+      || a.createdAt - b.createdAt
+      || a.id.localeCompare(b.id);
+  });
   else if (options.order === 'random') {
     // Fisher–Yates: change only the order; every eligible card is included.
     for (let i = selected.length - 1; i > 0; i--) {

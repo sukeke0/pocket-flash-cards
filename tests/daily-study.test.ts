@@ -58,13 +58,21 @@ describe('automatic daily study', () => {
     expect(planStudyStart(source, history, options, now).count).toBe(28);
     expect(planStudyStart(source, history.slice(0, 3), options, tomorrow).count).toBe(30);
   });
-  it('allows another capped session and shows a notice after the daily goal is achieved', () => {
+  it('continues with cards not yet seen today after the daily goal is achieved', () => {
     const source = cards(40);
     const history = source.slice(0, 30).map(item => review(item.id));
     const plan = planStudyStart(source, history, options, now);
     expect(plan.notice).toContain('今日の学習目標（30枚）は達成');
-    expect(plan.count).toBe(30);
-    expect(createSession(source, history, plan.options, now).initialCount).toBe(30);
+    expect(plan.count).toBe(10);
+    const session = createSession(source, history, plan.options, now);
+    expect(session.initialCount).toBe(10);
+    expect(session.queue.map(item => item.card.id)).toEqual(source.slice(30).map(item => item.id));
+  });
+  it('rotates by the oldest review today after every card has been seen', () => {
+    const source = cards(5);
+    const history = source.map((item, index) => review(item.id, now - (source.length - index) * 1_000));
+    const session = createSession(source, history, { ...options, dailyLimit: 3 }, now);
+    expect(session.queue.map(item => item.card.id)).toEqual(['0', '1', '2']);
   });
   it('fills the daily goal with future cards when fewer cards are due and permits study after all reviews are done', () => {
     const source = cards(5).map(item => ({ ...item, reviewCount: 1, nextReviewAt: now + DAY }));
