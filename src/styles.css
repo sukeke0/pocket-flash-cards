@@ -275,8 +275,8 @@ progress::-webkit-progress-value { background: #73a9ec; border-radius: 5px; }
 .language-picker { font-size: 13px; color: var(--muted); }
 .study-flip { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; background: transparent; border: 0; touch-action: manipulation; }
 .study-flip:focus-visible { outline: 3px solid var(--accent); outline-offset: -4px; }
-.rating-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.rate-button.skip { background: var(--search); color: var(--text); }
+.rating-buttons { display: grid; grid-template-columns: .72fr repeat(3, minmax(0, 1fr)) .72fr; gap: 7px; }
+.rate-button.navigation { background: var(--search); color: var(--text); display: grid; place-items: center; }
 .rate-button { min-height: 66px; font-weight: 650; border-radius: 16px; font-size: 16px; }
 .rate-button.again { background: #eb8d9f; color: #681d32; }
 .rate-button.hard { background: #ffdc80; color: #65470c; }

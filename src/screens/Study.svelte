@@ -20,6 +20,8 @@
   export let onhistory: (card: Card) => void;
   export let onedit: (card: Card) => void;
   let session = createSession(cards, reviews, options);
+  let previousSteps: { session: typeof session; rating?: Rating }[] = [];
+  let restoredCard: Card | undefined;
   let flipped = false;
   let skipped = 0;
   let busy = false;
@@ -31,7 +33,7 @@
   const ratings: { value: Rating; label: string }[] = [{ value: 'again', label: 'ダメ' }, { value: 'hard', label: 'あやしい' }, { value: 'easy', label: '余裕' }];
   $: queued = session.queue[0];
   // Refresh content after editing without rebuilding the queue or changing progress/side.
-  $: current = queued && { ...queued, card: latestCards.find(card => card.id === queued.card.id) ?? queued.card };
+  $: current = queued && { ...queued, card: restoredCard?.id === queued.card.id ? restoredCard : latestCards.find(card => card.id === queued.card.id) ?? queued.card };
   // Presentation only: never swap fields on the persisted card or its review history.
   $: promptSide = current && {
     text: options.reverse ? current.card.backText : current.card.frontText,
@@ -47,7 +49,9 @@
   };
   $: total = session.completed + session.queue.length;
   async function next(card: Card, rating?: Rating) {
+    previousSteps = [...previousSteps, { session, rating }];
     session = advanceSession(session, card, rating ? { rating, repeatAgain: options.repeatAgain, repeatHard: options.repeatHard } : undefined);
+    restoredCard = undefined;
     flipped = false; menu = false;
     await tick();
     heading?.focus({ preventScroll: true });
@@ -77,6 +81,25 @@
       await new Promise(resolve => setTimeout(resolve, 280));
     } finally { busy = false; }
   }
+  async function previous() {
+    const step = previousSteps.at(-1);
+    const item = step?.session.queue[0];
+    if (!step || !item || busy) return;
+    stopSpeech();
+    busy = true; error = '';
+    try {
+      restoredCard = step.rating ? await repository.undoReview(item.reviewId, item.card) : item.card;
+      if (step.rating) results = { ...results, [step.rating]: Math.max(0, results[step.rating] - 1) };
+      else skipped = Math.max(0, skipped - 1);
+      session = step.session;
+      previousSteps = previousSteps.slice(0, -1);
+      flipped = false; menu = false;
+      await tick();
+      heading?.focus({ preventScroll: true });
+      document.querySelector('.study-surface')?.scrollTo(0, 0);
+    } catch (e) { error = e instanceof Error ? e.message : '前のカードに戻れませんでした。もう一度お試しください。'; }
+    finally { busy = false; }
+  }
 </script>
 <div class="study-screen">
   <header class="study-header"><button class="text-button study-settings" aria-label="学習設定に戻る" disabled={busy} onclick={() => { stopSpeech(); menu = false; onsettings(); }}><Icon name="back" size={20} />設定</button><h1>{title}</h1><button class="icon-button" aria-label="学習メニュー" aria-expanded={menu} disabled={!current || busy} onclick={() => { stopSpeech(); menu = !menu; }}><Icon name="more" size={21} /></button></header>
@@ -102,13 +125,13 @@
     </div>
     <footer class="study-controls">
       {#if error}<p class="error" role="alert">{error}</p>{/if}
-      <p class="study-hint" id="study-gesture-hint">タップで{flipped ? promptSide.label : otherSide.label}へ · 評価またはスキップで次へ</p>
-      <div class="rating-buttons">{#each ratings as rating}<button class={'rate-button ' + rating.value} disabled={busy} onclick={() => rate(rating.value)}>{rating.label}</button>{/each}<button class="rate-button skip" disabled={busy} onclick={skip}>スキップ</button></div>
+      <p class="study-hint" id="study-gesture-hint">タップで{flipped ? promptSide.label : otherSide.label}へ · 矢印で戻る／スキップ</p>
+      <div class="rating-buttons"><button class="rate-button navigation" aria-label="前のカードに戻る" disabled={busy || !previousSteps.length} onclick={previous}><Icon name="previous" size={20} /></button>{#each ratings as rating}<button class={'rate-button ' + rating.value} disabled={busy} onclick={() => rate(rating.value)}>{rating.label}</button>{/each}<button class="rate-button navigation" aria-label="スキップして次へ" disabled={busy} onclick={skip}><Icon name="arrow" size={20} /></button></div>
       <span class="sr-only" role="status">{flipped ? otherSide.label : promptSide.label}を表示しています。</span>
     </footer>
   {:else}
     <section class="study-complete"><span class="completion-icon"><Icon name="check" size={40} /></span><h2>{session.completed ? 'おつかれさまでした' : 'この設定の対象カードはありません'}</h2>
-      {#if session.completed}<p>{session.initialCount}枚のカードを確認しました。</p><p>評価 {session.completed - skipped}{options.repeatAgain || options.repeatHard ? "回" : "枚"} · スキップ {skipped}{options.repeatAgain || options.repeatHard ? "回" : "枚"}</p><div class="result-counts">{#each ratings as rating}<div><span class={'rating-label ' + rating.value}>{rating.label}</span><strong>{results[rating.value]}</strong></div>{/each}</div><p class="muted small">{skipped === session.completed ? '学習記録は変更していません。' : '評価を保存しました。スキップしたカードの学習記録は変更していません。'}</p>
+      {#if session.completed}<p>{session.initialCount}枚のカードを確認しました。</p><p>評価 {session.completed - skipped}{options.repeatAgain || options.repeatHard ? "回" : "枚"} · スキップ {skipped}{options.repeatAgain || options.repeatHard ? "回" : "枚"}</p><div class="result-counts">{#each ratings as rating}<div><span class={'rating-label ' + rating.value}>{rating.label}</span><strong>{results[rating.value]}</strong></div>{/each}</div><p class="muted small">{skipped === session.completed ? '学習記録は変更していません。' : '評価を保存しました。スキップしたカードの学習記録は変更していません。'}</p>{#if previousSteps.length}<button class="secondary full" disabled={busy} onclick={previous}><Icon name="previous" size={18} /> 直前のカードに戻る</button>{/if}
       {:else}<p>デッキに戻り、学習設定やカードを確認してください。</p>{#if cards.length}<button class="secondary" onclick={onview}>カードを確認する</button>{/if}{/if}
       <button class="primary full" onclick={onclose}>戻る</button>
     </section>

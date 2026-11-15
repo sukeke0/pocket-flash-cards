@@ -117,6 +117,29 @@ export function createRepository(database: CardsDatabase) {
         return result;
       });
     },
+    async undoReview(reviewId: string, previousCard: Card) {
+      return database.transaction('rw', database.cards, database.reviews, async () => {
+        const review = await database.reviews.get(reviewId);
+        if (!review || review.cardId !== previousCard.id) throw new Error('取り消す評価が見つかりません。学習画面を開き直してください。');
+        const current = await database.cards.get(previousCard.id);
+        if (!current) throw new Error('カードが見つかりません。学習を終了して一覧を確認してください。');
+        const isLatestReview = current.reviewCount === previousCard.reviewCount + 1
+          && current.lastReviewedAt === review.reviewedAt
+          && current.nextReviewAt === review.nextReviewAt
+          && current.updatedAt === review.reviewedAt;
+        if (!isLatestReview) throw new Error('このカードは後から変更されているため、評価を取り消せません。');
+        // The old UI Blob may have been invalidated by Safari after the review
+        // write. Images are unchanged by a rating, so copy the current bytes.
+        const restored = await copyCardImages({
+          ...previousCard,
+          frontImage: current.frontImage,
+          backImage: current.backImage,
+        });
+        await database.cards.put(restored);
+        await database.reviews.delete(reviewId);
+        return restored;
+      });
+    },
     async importImageCards(rows: ImageCardInput[]) {
       if (!rows.length || rows.length > MAX_IMPORT_CARDS) throw new Error('カードは1〜1,000枚に分けてください。');
       for (const row of rows) {

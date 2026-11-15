@@ -1,6 +1,6 @@
 import {
   faGear, faPlay, faHouse, faFolderOpen, faClone, faEllipsis, faPlus,
-  faArrowRight, faXmark, faMagnifyingGlass, faCheck, faLeaf,
+  faArrowLeft, faArrowRight, faXmark, faMagnifyingGlass, faCheck, faLeaf,
   faDownload, faUpload, faImage, faSun, faBookOpen, faChartColumn,
   faCalendarDays, faChevronRight, faChevronLeft, faVolumeHigh,
   faTag, faArrowDownWideShort, faCircleInfo, faStop,
@@ -15,4 +15,5 @@ export const icons = {
   book: faBookOpen, chart: faChartColumn, calendar: faCalendarDays,
   chevron: faChevronRight, back: faChevronLeft, speaker: faVolumeHigh,
   tag: faTag, sort: faArrowDownWideShort, info: faCircleInfo, stop: faStop,
+  previous: faArrowLeft,
 };

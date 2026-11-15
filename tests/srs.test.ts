@@ -179,6 +179,21 @@ describe('review transactions', () => {
     expect(snapshot.reviews[0]).toMatchObject({ algorithm: 'simple-v1', rating: 'easy' });
     await expect(repo.reviewCard('a', 'again', 'same-event', now)).rejects.toThrow('すでに');
   });
+  it('undoes the latest rating and restores the previous scheduling state', async () => {
+    const before = (await repo.snapshot()).cards[0];
+    await repo.reviewCard('a', 'easy', 'event', now);
+    const restored = await repo.undoReview('event', before);
+    expect(restored).toEqual(before);
+    expect((await repo.snapshot())).toMatchObject({ cards: [before], reviews: [] });
+  });
+  it('does not overwrite a card changed after the rating', async () => {
+    const before = (await repo.snapshot()).cards[0];
+    await repo.reviewCard('a', 'easy', 'event', now);
+    await db.cards.update('a', { notes: 'edited', updatedAt: now + 1 });
+    await expect(repo.undoReview('event', before)).rejects.toThrow('後から変更');
+    expect((await db.cards.get('a'))?.notes).toBe('edited');
+    expect(await db.reviews.count()).toBe(1);
+  });
   it('rolls back card changes if history storage fails', async () => {
     db.reviews.hook('creating', () => { throw new Error('Simulated storage failure'); });
     await expect(repo.reviewCard('a', 'again', 'event', now)).rejects.toThrow('storage failure');
