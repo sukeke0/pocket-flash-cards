@@ -6,7 +6,7 @@ A mobile-first flashcard PWA built with Svelte, TypeScript, Vite, and Dexie. Org
 
 ## Development
 
-Requires Node.js 24 and pnpm 11.19.0.
+Requires Node.js 24.22.3 or newer in the Node.js 24 release line, and pnpm 11.19.0.
 
 ```sh
 git clone https://github.com/sukeke0/pocket-flash-cards.git
