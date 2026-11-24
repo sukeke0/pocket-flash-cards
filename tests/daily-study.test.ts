@@ -26,11 +26,30 @@ describe('automatic daily study', () => {
     expect(new Set(session.queue.map(item => item.card.id)).size).toBe(plan.count);
     expect(duplicated).toHaveLength(total + 1);
   });
-  it('selects by SRS priority before applying the cap, prioritizing due cards over future reviews', () => {
+  it('prioritizes every unlearned card over reviewed cards before applying the cap', () => {
     const source = [card('future', { reviewCount: 1, nextReviewAt: now + DAY }), card('new'), card('overdue', { reviewCount: 2, lastReviewedAt: now - 10 * DAY, nextReviewAt: now - 5 * DAY })];
     const session = createSession(source, [], { ...options, dailyLimit: 2 }, now);
-    expect(session.queue.map(item => item.card.id)).toEqual(['overdue', 'new']);
+    expect(session.queue.map(item => item.card.id)).toEqual(['new', 'overdue']);
     expect(source[0].id).toBe('future');
+  });
+  it('does not recycle weak reviewed cards while hundreds of unlearned cards remain', () => {
+    const reviewed = Array.from({ length: 10 }, (_, i) => card(`reviewed-${i}`, {
+      reviewCount: 1,
+      lastReviewedAt: now - 30 * DAY,
+      nextReviewAt: now - 29 * DAY,
+      masteryLevel: 0,
+      difficulty: 10,
+    }));
+    const unlearned = Array.from({ length: 490 }, (_, i) => card(`new-${i}`, { createdAt: i + 2 }));
+    const first = createSession([...reviewed, ...unlearned], [], { ...options, dailyLimit: 10 }, now);
+    expect(first.queue.map(item => item.card.id)).toEqual(unlearned.slice(0, 10).map(item => item.id));
+
+    const learnedIds = new Set(first.queue.map(item => item.card.id));
+    const nextDayCards = [...reviewed, ...unlearned].map(item => learnedIds.has(item.id)
+      ? { ...item, reviewCount: 1, lastReviewedAt: now, nextReviewAt: now + DAY }
+      : item);
+    const second = createSession(nextDayCards, [], { ...options, dailyLimit: 10 }, now + DAY);
+    expect(second.queue.map(item => item.card.id)).toEqual(unlearned.slice(10, 20).map(item => item.id));
   });
   it('subtracts unique reviews in the selected decks, ignoring repeats and unrelated or deleted cards', () => {
     const source = cards(100);

@@ -100,12 +100,14 @@ export function createSession(cards: Card[], history: Review[], options = DEFAUL
   for (const review of history) if (review.rating === 'again') failures.set(review.cardId, (failures.get(review.cardId) ?? 0) + 1);
   const priority = (card: Card) => scheduler.priority(card, now) + 8 * (failures.get(card.id) ?? 0) / Math.max(1, card.reviewCount);
   const { selected, budget, limit } = sessionSelection(cards, history, options, now);
+  const unlearned = (card: Card) => Number(card.reviewCount === 0);
   const due = (card: Card) => Number(card.reviewCount === 0 || card.nextReviewAt <= now);
   if (options.mode === 'automatic' || options.order === 'mastery') selected.sort((a, b) => {
     const dailyRotation = budget && budget.reviewed.has(a.id) && budget.reviewed.has(b.id)
       ? (budget.lastReviewed.get(a.id) ?? 0) - (budget.lastReviewed.get(b.id) ?? 0)
       : 0;
     return dailyRotation
+      || (options.mode === 'automatic' ? unlearned(b) - unlearned(a) : 0)
       || (budget ? due(b) - due(a) : 0)
       || priority(b) - priority(a)
       || a.createdAt - b.createdAt

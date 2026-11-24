@@ -31,7 +31,7 @@
     <div class="study-setup-body stack">
       <div class="setup-deck"><span class="tile-icon"><Icon name="book" /></span><div class="grow"><h3>{title}</h3><p>デッキ内 {cards.length}枚</p></div></div>
       {#if revising}<p class="muted small">ここまでの評価は保存されています。設定を適用すると、出題を最初から組み直します。</p>{/if}
-      {#if options.mode === 'automatic'}<p class="notice small">自動学習：未学習と復習時刻を迎えたカードを優先して出題します。{#if options.dailyLimit}1日の学習目標は{Math.min(options.dailyLimit, cards.length)}枚です。今日学習済みの枚数を差し引き、目標達成後も追加で学習できます。{/if}</p>
+      {#if options.mode === 'automatic'}<p class="notice small">自動学習：未学習のカードを最優先し、すべて学習した後は復習時刻と習熟度に合わせて出題します。{#if options.dailyLimit}1日の学習目標は{Math.min(options.dailyLimit, cards.length)}枚です。今日学習済みの枚数を差し引き、目標達成後も追加で学習できます。{/if}</p>
       {:else}<fieldset class="form-fields setup-order"><legend>学習モード</legend>
         <label class="order-choice"><input type="radio" name="study-mode" value="deck" bind:group={options.mode} /><span><strong>デッキ学習</strong><small>未学習と復習時刻を迎えたカードを出題します。</small></span></label>
         <label class="order-choice"><input type="radio" name="study-mode" value="full" bind:group={options.mode} /><span><strong>総復習</strong><small>復習時刻にかかわらず、全カードを対象にします。</small></span></label>
