@@ -133,7 +133,7 @@
     <section class="study-complete"><span class="completion-icon"><Icon name="check" size={40} /></span><h2>{session.completed ? 'おつかれさまでした' : 'この設定の対象カードはありません'}</h2>
       {#if session.completed}<p>{session.initialCount}枚のカードを確認しました。</p><p>評価 {session.completed - skipped}{options.repeatAgain || options.repeatHard ? "回" : "枚"} · スキップ {skipped}{options.repeatAgain || options.repeatHard ? "回" : "枚"}</p><div class="result-counts">{#each ratings as rating}<div><span class={'rating-label ' + rating.value}>{rating.label}</span><strong>{results[rating.value]}</strong></div>{/each}</div><p class="muted small">{skipped === session.completed ? '学習記録は変更していません。' : '評価を保存しました。スキップしたカードの学習記録は変更していません。'}</p>{#if previousSteps.length}<button class="secondary full" disabled={busy} onclick={previous}><Icon name="previous" size={18} /> 直前のカードに戻る</button>{/if}
       {:else}<p>デッキに戻り、学習設定やカードを確認してください。</p>{#if cards.length}<button class="secondary" onclick={onview}>カードを確認する</button>{/if}{/if}
-      <button class="primary full" onclick={onclose}>戻る</button>
+      <button class="primary full" onclick={onclose}>{options.mode === 'automatic' ? 'ホームに戻る' : 'デッキに戻る'}</button>
     </section>
   {/if}
 </div>

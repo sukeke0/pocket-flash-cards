@@ -57,7 +57,7 @@ test('large transparent images compress offline, survive review and backup resto
   await page.getByRole('button', { name: '学習を始める', exact: true }).click();
   await page.getByRole('button', { name: '裏面を見る', exact: true }).click();
   await page.getByRole('button', { name: '余裕', exact: true }).click();
-  await page.getByRole('button', { name: '戻る', exact: true }).click();
+  await page.getByRole('button', { name: 'デッキに戻る', exact: true }).click();
   await page.getByRole('link', { name: 'カード', exact: true }).click();
   const afterReview = (await storedData(page)).cards.find(card => card.id === original.id)!;
   expect(afterReview.frontImage).toEqual(original.frontImage);
